@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+
+        <link rel="stylesheet" href="../../css/style.css">
+
+        <!-- Latest compiled and minified CSS -->
+       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css">
+
+       <!-- jQuery library -->
+       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+       <!-- Popper JS -->
+       <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.0/umd/popper.min.js"></script>
+
+       <!-- Latest compiled JavaScript -->
+       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/js/bootstrap.min.js"></script>
+
+       <script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+
+       <style>
+       .container{
+           font-family: 'Nunito', sans-serif;
+       }
+
+       p, li{
+           font-size: 1.3em;
+       }
+       </style>
+
+       <!-- Google ADS -->
+       <script>
+       (adsbygoogle = window.adsbygoogle || []).push({
+       google_ad_client: "ca-pub-7951936524883243",
+       enable_page_level_ads: true
+       });
+       </script>
+
+        <title>ChatterBox</title>
+    </head>
+    <body>
+
+        <!-- Navigation -->
+       <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+         <div class="container">
+           <a class="navbar-brand" href="index.html">Gtx96 GitHub Page</a>
+               <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+                 <span class="navbar-toggler-icon"></span>
+               </button>
+           <div class="collapse navbar-collapse" id="navbarResponsive">
+             <ul class="navbar-nav ml-auto">
+               <li class="nav-item">
+                 <a class="nav-link" href="index.html">Home
+                   <span class="sr-only">(current)</span>
+                 </a>
+               </li>
+               <li class="nav-item">
+                 <a class="nav-link" href="#">About</a>
+               </li>
+               <li class="nav-item">
+                 <a class="nav-link" href="#">Contact</a>
+               </li>
+             </ul>
+           </div>
+         </div>
+        </nav>
+
+        <!-- Page content -->
+        <div class="container">
+            <h1 class="text-center mt-4 display-4">ChatterBox</h1>
+            <p>Codice sorgente completo: <a href="https://github.com/GTX96/ChatterBox" target="_blank">qui</a></p>
+            <hr>
+
+            <h2 style="font-size:40px;">Overview</h2>
+
+            <p class="lead">ChatterBox e' un progetto sviluppato per il Progetto di Sistemi Operativi e Laboratorio a.a 2016/2017, Universita di Pisa.</p>
+            <br>
+
+            <p>Lo scopo del progetto è lo sviluppo in C di un server concorrente che implementa una chat. Gli utenti della chat possono scambiarsi messaggi testuali e/o files collegandosi al server con un programma client.</p>
+
+            <p>Ogni utente della chat è identificato univocamente da un nickname alfanumerico. L’utente si connette al server, invia richieste e riceve risposte utilizzando un client la cui struttura base è fornita dai docenti (vedere il file client.c nel kit del progetto). Uno o piú processi client comunicano con il server per inviare richieste di vario di tipo.</p>
+
+            <p>Tra le operazioni gestite dal server troviamo:</p>
+            <ul>
+                <li><strong>Registrazione di un nuovo utente</strong></li>
+                <li><strong>Richiesta di connessione per un utente giá registrato</strong></li>
+                <li><strong>Invio messaggi testuali tra utenti</strong></li>
+                <li><strong>Invio file tra utenti</strong></li>
+                <li><strong>Lista utenti online</strong></li>
+                <li><strong>History dei messaggi</strong></li>
+                <li><strong>Deregistrazione di un utente</strong></li>
+                <li><strong>Richiesta di disconnessione per un utente</strong></li>
+
+            </ul>
+
+            <p>Per ogni messaggio di richiesta il server risponde al client con un messaggio di esito dell’operazione richiesta e con l’eventuale risposta. Ad esempio, se si vuole inviare un messaggio ad un utente non esistente (cioè il cui nickname non è stato mai registrato), il server risponderà con un messaggio di errore opportunamento codificato oppure risponderà con un messaggio di successo (codificato con il codice OP OK – vedere il file ops.h nel del codice sorgente contenente i codici delle operazioni di richiesta e di risposta).</p>
+
+            <p><strong>La comunicazione tra client e server avviene tramite socket di tipo AF UNIX.</strong></p>
+
+            <p>Il server al suo interno implementa un sistema multi-threaded in grado di gestire concorrentemente sia nuove connessioni da nuovi client che gestire le richieste su connessioni già stabilite. Un cliente può sia inviare una sola richiesta per connessione
+oppure, inviare piú richieste sulla stessa connessione (ad esempio: postare un messaggio ad un utente, inviare un file ad un nickname, inviare un messaggio a tutti gli
+utenti, recuperare file inviati da altri client, etc...). Il numero massimo di connessioni concorrenti che il server chatterbox gestisce è stabilito dall’opzione di configurazione
+MaxConnections. Se tale numero viene superato, dovrà essere ritornato al client un opportuno messaggio di errore (vedere la codifiche dei messaggi di errore nel file ops.h).
+Il numero di thread utilizzati per gestire le connessioni è specificato nel file di configurazione con l’opzioni ThreadsInPool. Tale numero specifica la dimensione di un pooldi threads, sempre attivi per tutta la durata dell’esecuzione del server e che il server chatterbox utilizzerà per gestire le connessioni dei client. Tale valore non può essere
+0.</p>
+
+<p>Un thread appartenente al pool gestisce una sola richiesta alla volta inviata da
+uno dei client. Non appena conclude la gestione della richiesta, controlla se ci sono
+altre richieste da servire dalla coda delle richieste ed in caso affermativo ne prende una
+da gestire. Se non ci sono richiesta da servire, il thread si mette in attesa di essere
+svegliato per gestire una nuova richiesta.</p>
+
+<p>Non appena il server accetta una nuova connessione da un client che ha inviato
+una richiesta di CONNECT, il server invia al client la lista di tutti gli utenti connessi
+in quel determinato istante</p>
+
+<p><strong>Il server può essere terminato in ogni momento della sua esecuzione inviando un
+segnale di SIGINT, SIGTERM o SIGQUIT</strong></p>
+
+<!-- Pagination -->
+  <ul class="pagination justify-content-center mb-4">
+    <li class="page-item ">
+      <a class="page-link" href="#">Next Part</a>
+    </li>
+</ul>
+
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="py-5 bg-dark">
+             <div class="container">
+                <p class="m-0 text-center text-white">Hosted On GitHub Pages</p>
+             </div>
+          <!-- /.container -->
+        </footer>
+    </body>
+</html>
