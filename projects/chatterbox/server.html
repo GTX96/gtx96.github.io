@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+
+        <link rel="stylesheet" href="../../css/style.css">
+        <script type="text/javascript" src="../../js/includeHtml.js"></script>
+
+        <!-- Latest compiled and minified CSS -->
+       <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css">
+
+       <!-- jQuery library -->
+       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+       <!-- Popper JS -->
+       <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.0/umd/popper.min.js"></script>
+
+       <!-- Latest compiled JavaScript -->
+       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/js/bootstrap.min.js"></script>
+
+       <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+
+       <script async src="//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+
+       <style>
+       .container{
+           font-family: 'Nunito', sans-serif;
+       }
+
+       p{
+           font-size: 20px;
+       }
+
+       pre{
+           overflow: scroll;
+           max-height: 700px;
+           font-size: 20px;
+       }
+
+       .list-descr{
+           font-size: 20px;
+       }
+       </style>
+
+        <title>ChatterBox | Server</title>
+    </head>
+    <body>
+
+        <!-- Navbar -->
+        <div w3-include-html="../../basic_navbar.html"></div>
+
+        <div class="container mb-5">
+            <h1 class="text-center mt-4 display-4">ChatterBox</h1>
+            <p>Codice sorgente completo: <a href="https://github.com/GTX96/ChatterBox" target="_blank">qui</a></p>
+            <hr>
+
+            <h2 style="font-size:40px;">Il Server</h2>
+
+            <p class="lead">In questa sezione viene descritta l'implementazione del server di ChatterBox.</p>
+
+            <p >I file che implementano il server sono: <b>server.h, server_init.c, server_start.c, listener.c</b></p>
+
+
+            <p>Il server implementato e' multithread AF_UNIX con la
+caratteristica di poter essere terminato attraverso determinati segnali,e di poter
+gestire il segnale SIGUSR1 come meglio si preferisce</p>
+
+            <p>La struttura che rappresenta il server e' la seguente:</p>
+            <pre class="prettyprint">/**
+                 * @struct server_t
+                 * @brief struttura del server
+                 * @var threadpool threadpool del server
+                 * @var fd fd del server
+                 * @var sa indirizzo del server
+                 * @var max_connection numero massimo di connessioni accettate dal server
+                 * @var messageSize size dei messaggi che riceve dai client
+                 * @var listener_thread id del thread lsitener
+                 */
+                typedef struct server{
+                    threadpool_t *threadpool;
+                    int fd;
+                    struct sockaddr_un sa; //indirizzo server
+                    int max_connection;
+                    size_t messageSize;
+                    pthread_t listener_thread;
+                }server_t;</pre>
+
+                <br>
+                <p>Sono definite poi,delle funzioni che devono essere implementate da chi utilizza il
+                server:</p>
+                <pre class="prettyprint">
+                /**
+                 * @struct server_function_t
+                 * @brief Struttura per passare al server le sue funzioni vitali
+                 *
+                 * @var client_manager_fun funzione per gestire il client
+                 * @var arg_cmf argomenti per la funzione client_manager_fun
+                 * @var read_message_fun funzione per leggere il messaggio da un client
+                 * @var signal_usr_handler funzione per gestire il segnale sigusr1
+                 * @var arg_suh argomenti per la funzione signal_usr_handler
+                 * @var client_out_of_bound funzione per gestire il caso in cui ci sono troppi client
+                 * @var arg_cob argomenti per la funzione client_out_of_bound
+                 * @var disconnect_client funzione per gestire la disconnessione di un client
+                 * @var arg_dc argomenti per la funzione disconnect_client
+                 *
+                 * @note tutte le funzioni ritornano int per controllare l'esito con cui terminano
+                 */
+                typedef struct{
+                    int (*client_manager_fun)(void *,int,void*); // 1 buffer,2 fd_client,3 arg
+                    void *arg_cmf;
+                    int (*read_message_fun)(int,void*); //1 fd client, 2 buffer
+                    int (*signal_usr_handler)(void*);//solo argomenti
+                    void *arg_suh;
+                    int (*client_out_of_bound)(int,void*);//1 fd, 2 argomenti
+                    void *arg_cob;
+                    int (*disconnect_client)(int,void*);//1 fd,2 argomenti
+                    void *arg_dc;
+                }server_function_t;</pre>
+                <br>
+
+                <p>Viene poi definita un interfaccia,per gestire il Server,costituita dalle seguenti funzioni:</p>
+                <pre class="prettyprint">
+                                        /**
+                     * @function init_server
+                     * @brief inizializza e configuro un nuovo server di tipo AF_UNIX
+                     *
+                     * @param sockname path del socket dove risiede il server
+                     * @param messageSize size del messaggio che puo' ricevere il server
+                     * @param max_connection numero massimo di client che possono essere connessine
+                     *
+                     * @return on success puntatore al server,altimenti NULL e setta errno.
+                     */
+                    server_t* init_server(char *sockname,size_t messageSize,int max_connection);
+
+                    /**
+                     * @function start_server
+                     * @brief Fa partire il server
+                     *
+                     * @param srv istanza del server da far partire
+                     * @param num_pool_thread numero di thread del pool da far partire
+                     * @param funs struttura delle funzioni utilizzate dal server
+                     *
+                     * @return 0 on success. Altrimenti in caso di errore puo' ritornare:
+                               codice errore: in caso un thread del pool fallisca.
+                              -1: per tutti gli altri casi di errore.Setta errno.
+                     *
+                     * @note Il server viene terminato con un segnale(SIGTERM,SIGQUIT,SIGINT).
+                     */
+                    int start_server(server_t *srv,int num_pool_thread,server_function_t funs);
+
+
+                    /**
+                     * @function listener
+                     * @brief Funzione che deve eseguire il listener_thread
+                     * @param server istanza del server
+                     *
+                     * @return EXIT_SUCCESS in caso di successo,altrimenti EXIT_FAILURE
+                     *         in questo caso se e' fallito un thread del pool del server
+                     *         setta thread_error per propagare il codice dell'errore
+                     *         del thread che e' fallito
+                     */
+                    void* listener(void* server);
+                </pre>
+                <br>
+
+                <p>Il server dopo esser stato inizializzato e configurato (attraverso <i>server_init()</i> ), puo’
+esser fatto partire attraverso <i>server_start()</i>. In fase di startup vengono creati i thread
+del pool, il listener thread , e vengono mascherati tutti i segnali per i thread del pool,in
+modo tale da redirigere i segnali al listener thread.</p>
+
+                <p>Il listener svolge il ruolo principale; Prima di partire nel suo ciclo di vita,maschera e
+definisce degli handler sui i segnali relativi alla gestione della terminazione,e i segnali
+USR1 e USR2, inoltre crea una coda di supporto (coda dei descrittori),che serve per
+aggiornare i descrittori dei client dopo che i thread del pool hanno svolto le loro
+richieste.</p>
+
+<p>Il listener parte nel suo ciclo di vita,in cui opera in questo modo :</p>
+<ol class="list-descr">
+    <li>Blocca tutti i segnali</li>
+    <li>Aggiorna il set dei descrittori da cui fare una read (read_set)</li>
+    <li>chiama la pselect() per 2 motivi:
+        <ol class="list-descr">
+            <li>Evitare di bloccarsi su una read di un client</li>
+            <li>Poter settare la maschera per gestire i segnali arrivati fino ad ora,in modo
+    tale da settare i flag dei segnali da gestire.</li>
+        </ol>
+    </li>
+    <li>Uscita dalla pselect(),con ribloccaggio di tutti i segnali.</li>
+    <li>Se e’ attivo il flag del segnale di :
+        <ul class="list-descr">
+            <li><b>terminazione :</b> si avvia la procedura di terminazione</li>
+            <li><b>USR1: </b> si aggiunge la funzione signal_usr_handler,(che puo’ essere visto
+come un task), alla coda dei task del threadpool</li>
+            <li><b>USR2: </b> si aggiornano i descrittori da cui fare le read,dalla coda dei
+descrittori,dopo che quest’ultimi sono stati modificati da uno o piu thread del
+pool.</li>
+        </ul>
+    </li>
+    <li>Si scorrono i vari descrittori, fino a quando non se ne trova uno settato,cioe’
+pronto per una read e se :
+        <ul>
+            <li>e’ un nuovo client, lo si accetta </li>
+            <li>e’ un client che effettua una richiesta , si inserisce la funzione
+init_worker()(come task) e l’fd del client, all’interno della coda dei task del
+threadpool,in modo da far gestire la richiesta del client ad un thread del
+pool.</li>
+        </ul>
+    </li>
+</ol>
+
+        <p>La funzione init_worker() non fa altro che preparare il thread in questione alla
+        gestione di una singola richiesta del client,dopodiche setta il descrittore come da
+        rimuovere oppure da riutilizzare e lo inserisce nella coda dei descrittori, avvisando il
+        listener con il segnale USR2.</p>
+
+        <p>Di seguito il codice del listener:</p>
+        <pre class="prettyprint">
+            void* listener(void* srv)
+{
+     /* variabili utili */
+     int fd;  //per verificare risultati select
+     int fd_client; //socket per l'I/O con un client
+     int err = 0,curr_error = 0; //per la gestione degli errori
+     fd_set read_set,active_set; //set usati per la select
+     int actual_client = 0; //numero attuale di client,e massimo descrittore
+     unsigned int *fd_clients; //struttura per contenere gli fd dei client da passare ai thread
+
+     //inizializzo istanza del server dichiarata globalmente
+     server = srv;
+
+     //installo i signal handler
+     err = set_listener_signal_handler();
+
+     //errore set handler
+     if(err == -1)
+     {
+         curr_error = errno;
+         goto lst_error;
+     }
+
+     //server partito
+     run = 1;
+
+     //inizializzo coda dei descrittori da aggiornare
+     descriptors.queue = create_queue(FIFO,sizeof(queue_descr_elem_t));
+
+     //errore creazione coda dei descrittori da aggiornare
+     if(descriptors.queue == NULL)
+     {
+         curr_error = errno;
+         goto lst_error;
+     }
+
+     //inizializzo mutex per la coda dei descrittori da aggiornare
+     err = pthread_mutex_init(&descriptors.mtx,NULL);
+
+     if(err)
+     {
+         errno = err;
+         goto lst_error2;
+     }
+
+     //alloco spazio per struttura che contiene gli fd dei client,da passare ai thread worker.
+     fd_clients = malloc((server->max_connection + 3) * sizeof(unsigned int));
+
+     //errore creazione argomenti per thread
+     if(fd_clients == NULL)
+     {
+         curr_error = errno;
+         goto lst_error3;
+     }
+
+     //inizializzo l'active_set
+     FD_ZERO(&active_set);
+     FD_SET(server->fd,&active_set);
+
+     //blocco tutti i segnali per riceverli nella select
+     sigset_t curr_mask,signal_handler_mask;
+     sigfillset(&curr_mask);
+     pthread_sigmask(SIG_SETMASK,&curr_mask,&signal_handler_mask);
+
+     //qui parte il ciclo di vita del server
+     while(run)
+     {
+        //preparo maschera per select
+         read_set = active_set;
+
+         #ifdef DEBUG
+             printf("Listener: Select in attesa || client connessi : %d\n",actual_client);
+         #endif
+
+         //uso FD_SETSIZE come valore massimo degli fd
+         //mi blocco fin quando non posso fare una read da un client,oppure arriva un nuovo client,oppure arriva un segnale
+         int ds = pselect(FD_SETSIZE,&read_set,NULL,NULL,NULL,&signal_handler_mask);
+
+         //ho ricevuto un segnale oppure e' fallita la select
+         if(ds == -1)
+         {
+             //arrivato segnale
+             if(errno == EINTR)
+             {
+                 //Controllo i flag dei segnali
+
+                 //controllo la coda dei descrittori da aggiornare
+                 if(updateSet)
+                 {
+                     err = update_active_set(&active_set,&actual_client);
+
+                     //errore update del active set
+                     if(err == -1)
+                     {
+                         curr_error = errno;
+                         goto lst_error4;
+                     }
+                 }
+
+                 //se devo eseguire la funzione definita con sigusr
+                 if(sigusr)
+                 {
+                     sigusr = 0; //risetto a 0 il segnale di sigusr
+
+                     //delego un thread alla gestione del segnale USR1
+                     err = threadpool_add_task(server->threadpool,signal_usr_handler,(void*)arg_suh);
+
+                     //errore add task
+                     if(err == -1)
+                     {
+                         curr_error = errno;
+                         goto lst_error4;
+                     }
+
+                 }
+
+                 //ritorno nella select
+                 continue;
+             }
+
+             else{ //errore nella pselet
+                 curr_error = errno;
+                 goto lst_error4;
+             }
+         }
+
+         //se arrivo qui e' arrivato un nuovo client oppure si puo fare una read
+
+         //vado a vedere quali descrittori sono pronti
+         for (fd = 0; fd <= FD_SETSIZE; fd++)
+         {
+             //trovato un descrittore pronto
+             if(FD_ISSET(fd,&read_set))
+             {
+                 //nuovo client
+                 if(fd == server->fd)
+                 {
+                     //recupero fd client arrivato
+                     fd_client = accept(server->fd,NULL,NULL);
+
+                     //controllo esito della accept
+                     if(fd_client == -1)
+                     {
+                         //arrivato segnale
+                         if(errno == EINTR)
+                         {
+                             //mi fermo e torno all'inizio per controllare il segnale arrivato
+                             break;
+                         }
+                         else{
+                             curr_error = errno;
+                             goto lst_error4;
+                         }
+                     }
+
+                     //incremento numero di client connessi
+                     ++actual_client;
+
+                     //troppi client?
+                     if(actual_client > server->max_connection)
+                     {
+                         //procedura per buttare fuori un client
+                         err = (*(client_out_of_bound))(fd,arg_cob);
+
+                         //errore nella funzione
+                         if(err == -1)
+                         {
+                             curr_error = errno;
+                             goto lst_error4;
+                         }
+
+                         //lo tolgo dal set
+                         FD_CLR(fd_client,&active_set);
+
+                         //rimuovo il client
+                         remove_client(fd_client,&actual_client);
+
+                         continue;
+                     }
+
+                     #ifdef DEBUG
+                         printf("Listener: Nuova connessione da parte di: %d\n",fd_client);
+                     #endif
+
+                     //setto client come attivo
+                     FD_SET(fd_client,&active_set);
+                 }
+                 //un client e' pronto per la comunicazione
+                 else
+                 {
+                     #ifdef DEBUG
+                         printf("Listener: il client %d e' pronto\n",fd);
+                     #endif
+
+                     //se arrivo qui,allora aggiungo alla coda dei task del threadpool
+
+                     //lo tolgo dal set,perche' ora verra' gestito da un thread del pool
+                     FD_CLR(fd,&active_set);
+
+                     //preparo gli argomenti per il thread worker
+                     fd_clients[fd] = fd;
+
+                     /*
+                      * Qui aggiungo alla coda dei task,sia la funzione che deve svolgere
+                      * un thread worker,sia i corrispondenti argomenti
+                      */
+
+                     err = threadpool_add_task(server->threadpool,init_worker,(void*)&fd_clients[fd]);
+
+                     //errore nell'aggiunta del task
+                     if(err == -1)
+                     {
+                         curr_error = errno;
+                         goto lst_error4;
+                     }
+
+                 }//fine delle gestione del client pronto
+
+             }//fine del if
+
+         }//fine del for
+
+     }//fine del while
+
+     //se sono arrivato qui allora il listener deve terminare,deallocando tutto
+
+    //termino normalmente
+    err = server_close(&active_set,fd_clients);
+
+    //controllo esito terminazione server
+    if(err == -1 || err > 0)
+    {
+        //caso in cui e' fallito un thread
+        if(err > 0)
+        {
+            //setto thread error per poter propagare il codice di ritorno dell'errore
+            server_thread_error = err;
+        }
+
+        pthread_exit((void*)EXIT_FAILURE);
+    }
+    //tutto andato bene
+    else{
+        pthread_exit((void*)EXIT_SUCCESS);
+    }
+
+//handler errori listener
+ lst_error4:
+     close_all_client(&active_set);
+     free(fd_clients);
+     goto lst_error3;
+
+ lst_error3:
+     pthread_mutex_destroy(&descriptors.mtx);
+     goto lst_error2;
+
+ lst_error2:
+     destroy_queue(&descriptors.queue);
+     goto lst_error;
+
+ lst_error:
+
+     threadpool_destroy(&server->threadpool);
+     //rimuovo indirizzo fisico
+     unlink(server->sa.sun_path);
+
+     close(server->fd);
+     free(server);
+
+     //risetto errno per sicurezza,cioe' che una funzione appena chiamata non fallisca e mi cambi errno
+     errno = curr_error;
+     pthread_exit((void*)EXIT_FAILURE);
+}
+        </pre>
+        <br>
+
+        <p>Il server termina o a causa dell’arrivo di un segnale di terminazione o causa di
+fallimento di un thread del pool,in quest’ultimo caso viene ritornato anche il codice
+dell’errore con cui e’ fallito il thread.</p>
+
+        <p class="font-weight-bold text-uppercase">Per maggiori info, vi invito a visionare il codice sorgente dei file relativi al server,
+        che sono: <i>server.h, server_init.c, server_start.c, listener.c</i></p>
+
+        <p>Codice sorgente completo: <a href="https://github.com/GTX96/ChatterBox" target="_blank">qui</a></p>
+
+        <!-- Pagination -->
+          <ul class="pagination justify-content-center mb-4">
+              <li class="page-item ">
+                <a class="page-link" href="overview.html">Previous</a>
+              </li>
+            <li class="page-item disabled">
+              <a class="page-link" href="server.html">Next</a>
+            </li>
+        </ul>
+
+        </div>
+
+        <!-- Footer  -->
+        <div w3-include-html="../../footer.html"></div>
+
+        <script>includeHTML();</script>
+        <!-- Code prettify  -->
+        <script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js?lang=c&amp;skin=sunburst"></script>
+
+    </body>
+</html>
